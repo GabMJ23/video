@@ -1,40 +1,318 @@
-# Core Streamlit - versions fixes et compatibles
-streamlit==1.28.1
-streamlit-option-menu==0.3.6
+import streamlit as st
+import os
+import tempfile
+from datetime import datetime
+import base64
+from PIL import Image, ImageDraw, ImageFont
+import matplotlib.pyplot as plt
+import requests
+import zipfile
+from io import BytesIO
 
-# Video Processing - versions testées Streamlit Cloud
-moviepy==1.0.3
-imageio==2.31.1
-imageio-ffmpeg==0.4.8
+# Configuration page
+st.set_page_config(
+    page_title="AI Video Generator Pro",
+    page_icon="🎬",
+    layout="wide"
+)
 
-# Audio Processing - versions stables  
-gtts==2.4.0
-pydub==0.25.1
+# CSS
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 3rem;
+        background: linear-gradient(45deg, #FF6B35, #F7931E);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-align: center;
+        margin-bottom: 2rem;
+        font-weight: bold;
+    }
+    .success-container {
+        background: linear-gradient(135deg, #1E3A8A, #3B82F6);
+        padding: 2rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Image Processing - versions compatibles
-Pillow==10.0.0
-opencv-python-headless==4.8.1.78
+class SimpleAIGenerator:
+    def __init__(self):
+        self.temp_dir = tempfile.mkdtemp()
+        
+        self.script_templates = {
+            "emploi_ia": """L'OCDE vient de publier un rapport TERRIFIANT sur l'IA. 40% des emplois vont disparaître d'ici 2030.
 
-# Data Visualization - versions fixes
-matplotlib==3.7.2
-seaborn==0.12.2
-plotly==5.15.0
+Les métiers intellectuels sont les premiers visés. Avocats, comptables, analystes financiers... L'IA GPT-4 passe déjà l'examen du barreau avec 90% de réussite.
 
-# AI/ML Libraries - versions stables
-openai==1.3.7
-anthropic==0.8.1
+Pendant que la France forme encore des comptables, la Chine investit 150 milliards dans l'IA. Résultat ? Dans 5 ans, nos diplômés seront obsolètes.
 
-# HTTP Requests - versions testées
-requests==2.31.0
+Le gouvernement doit agir MAINTENANT. Formation massive, revenu universel, taxation des robots. Tu penses que ton job est safe ? Dis-le moi en commentaire.""",
+            
+            "politique_ia": """2027 : l'élection présidentielle ne sera pas gagnée par le meilleur candidat, mais par la meilleure IA.
 
-# Data Processing - versions compatibles
-pandas==2.0.3
-numpy==1.24.4
+L'IA analyse tes données Facebook, tes recherches Google, tes achats Amazon. Elle crée des publicités politiques sur mesure, juste pour TOI.
 
-# Utilities - essentiels seulement
-python-dotenv==1.0.0
+Trump 2016 : Cambridge Analytica ciblait 50 millions d'Américains. En 2024, c'est 200 millions avec une précision laser.
 
-# Packages problématiques SUPPRIMÉS pour Streamlit Cloud
-# httpx - conflit avec requests
-# tempfile-manager - pas nécessaire
-# streamlit-option-menu - peut causer des conflits
+En France, aucune loi ne régule ça. Ta opinion politique ? Elle n'est plus vraiment la tienne. Comment on protège la démocratie contre ça ?""",
+            
+            "crypto": """La France vient d'adopter MiCA. Cette réglementation crypto va tout changer en Europe.
+
+Fini l'anarchie crypto. Désormais, chaque exchange doit avoir une licence, chaque stablecoin doit être adossé à des réserves réelles.
+
+Mais cette réglementation pourrait tuer l'innovation européenne. Pendant qu'on sur-régule, les USA créent des ETF Bitcoin.
+
+L'Europe rate-t-elle le coche crypto ? Ou protège-t-elle ses citoyens ? Débat ouvert en commentaires."""
+        }
+    
+    def detect_topic(self, user_input):
+        user_lower = user_input.lower()
+        if any(word in user_lower for word in ["emploi", "job", "travail"]):
+            return "emploi_ia"
+        elif any(word in user_lower for word in ["politique", "élection"]):
+            return "politique_ia"
+        elif any(word in user_lower for word in ["crypto", "bitcoin"]):
+            return "crypto"
+        return "emploi_ia"
+    
+    def generate_script(self, topic_input):
+        detected_topic = self.detect_topic(topic_input)
+        return self.script_templates[detected_topic]
+    
+    def create_thumbnail(self, title, style):
+        width, height = 1080, 1920
+        
+        colors = {
+            "urgent": ("#FF4444", "#000000", "#FFFFFF"),
+            "expert": ("#2E86AB", "#1a1a1a", "#FFFFFF"), 
+            "breaking": ("#FF6B35", "#000000", "#FFFF00")
+        }
+        
+        bg_color, text_bg, text_color = colors.get(style, colors["expert"])
+        
+        img = Image.new('RGB', (width, height), bg_color)
+        draw = ImageDraw.Draw(img)
+        
+        try:
+            font_title = ImageFont.truetype("arial.ttf", 80)
+        except:
+            font_title = ImageFont.load_default()
+        
+        # Texte simple
+        words = title.split()[:4]  # Max 4 mots
+        text = ' '.join(words)
+        
+        bbox = draw.textbbox((0, 0), text, font=font_title)
+        text_width = bbox[2]
+        text_height = bbox[3]
+        
+        x = (width - text_width) // 2
+        y = height // 3
+        
+        # Background rectangle
+        draw.rectangle([x-30, y-20, x+text_width+30, y+text_height+20], fill=text_bg)
+        draw.text((x, y), text, fill=text_color, font=font_title)
+        
+        # Badge style
+        badge_text = style.upper()
+        draw.rectangle([50, 50, 300, 120], fill=text_color)
+        draw.text((70, 70), badge_text, fill=text_bg, font=font_title)
+        
+        return img
+    
+    def create_chart(self, script_text):
+        plt.style.use('dark_background')
+        fig, ax = plt.subplots(figsize=(10, 6), facecolor='#1a1a1a')
+        
+        if "40%" in script_text:
+            categories = ['Emplois Sûrs', 'Emplois Menacés']
+            values = [60, 40]
+            colors = ['#2E86AB', '#FF4444']
+            
+            bars = ax.bar(categories, values, color=colors)
+            ax.set_title('Impact IA sur l\'Emploi (2030)', 
+                        fontsize=20, color='white', pad=20)
+            
+            for bar, value in zip(bars, values):
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2., height,
+                       f'{value}%', ha='center', va='bottom', 
+                       fontsize=16, color='white', weight='bold')
+        else:
+            years = [2020, 2021, 2022, 2023, 2024, 2025]
+            investments = [10, 25, 60, 150, 300, 600]
+            
+            ax.plot(years, investments, color='#FF6B35', linewidth=3, marker='o')
+            ax.set_title('Investissements IA (Milliards €)', 
+                        fontsize=20, color='white', pad=20)
+        
+        ax.tick_params(colors='white')
+        ax.grid(True, alpha=0.3)
+        
+        chart_path = os.path.join(self.temp_dir, 'chart.png')
+        plt.savefig(chart_path, dpi=150, bbox_inches='tight', 
+                   facecolor='#1a1a1a')
+        plt.close()
+        
+        return chart_path
+    
+    def text_to_speech(self, text):
+        try:
+            from gtts import gTTS
+            tts = gTTS(text=text, lang='fr', slow=False)
+            audio_path = os.path.join(self.temp_dir, 'speech.mp3')
+            tts.save(audio_path)
+            return audio_path
+        except Exception as e:
+            st.error(f"Erreur TTS : {e}")
+            return None
+    
+    def create_package(self, script, thumbnail, chart_path, audio_path):
+        zip_path = os.path.join(self.temp_dir, 'package.zip')
+        
+        with zipfile.ZipFile(zip_path, 'w') as zipf:
+            # Script
+            script_path = os.path.join(self.temp_dir, 'script.txt')
+            with open(script_path, 'w', encoding='utf-8') as f:
+                f.write(script)
+            zipf.write(script_path, 'script.txt')
+            
+            # Miniature
+            thumb_path = os.path.join(self.temp_dir, 'thumbnail.png')
+            thumbnail.save(thumb_path)
+            zipf.write(thumb_path, 'thumbnail.png')
+            
+            # Chart
+            if chart_path and os.path.exists(chart_path):
+                zipf.write(chart_path, 'chart.png')
+            
+            # Audio
+            if audio_path and os.path.exists(audio_path):
+                zipf.write(audio_path, 'audio.mp3')
+        
+        return zip_path
+
+def main():
+    st.markdown('<h1 class="main-header">🎬 AI Video Generator Pro</h1>', 
+                unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <p style="font-size: 1.2rem;">Transformez vos idées en contenus viraux</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Interface principale
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.header("📝 Création de Script")
+        
+        topic = st.text_area(
+            "💡 Décrivez votre sujet",
+            placeholder="Ex: Impact de l'IA sur l'emploi en France",
+            height=100
+        )
+        
+        style = st.selectbox("Style", 
+                           ["urgent", "expert", "breaking"],
+                           format_func=lambda x: {
+                               "urgent": "🚨 Urgent", 
+                               "expert": "🎓 Expert",
+                               "breaking": "📢 Breaking"
+                           }[x])
+        
+        # Templates rapides
+        col_t1, col_t2, col_t3 = st.columns(3)
+        with col_t1:
+            if st.button("💼 IA & Emploi"):
+                topic = "Impact de l'IA sur l'emploi français"
+        with col_t2:
+            if st.button("🗳️ IA & Politique"):
+                topic = "IA manipule les élections démocratie"
+        with col_t3:
+            if st.button("₿ Crypto"):
+                topic = "MiCA réglementation crypto Europe"
+        
+        if st.button("🚀 Générer", type="primary"):
+            if topic:
+                generator = SimpleAIGenerator()
+                
+                with st.spinner("Génération en cours..."):
+                    progress = st.progress(0)
+                    
+                    # Script
+                    script = generator.generate_script(topic)
+                    progress.progress(25)
+                    
+                    # Miniature
+                    thumbnail = generator.create_thumbnail(topic, style)
+                    progress.progress(50)
+                    
+                    # Chart
+                    chart_path = generator.create_chart(script)
+                    progress.progress(75)
+                    
+                    # Audio
+                    audio_path = generator.text_to_speech(script)
+                    progress.progress(90)
+                    
+                    # Package
+                    zip_path = generator.create_package(script, thumbnail, chart_path, audio_path)
+                    progress.progress(100)
+                    
+                    st.success("✅ Contenu généré !")
+                    
+                    # Results
+                    with st.expander("📜 Script", expanded=True):
+                        st.text_area("", script, height=150, disabled=True)
+                    
+                    col_res1, col_res2 = st.columns(2)
+                    with col_res1:
+                        st.subheader("🖼️ Miniature")
+                        st.image(thumbnail, use_column_width=True)
+                    
+                    with col_res2:
+                        st.subheader("📊 Graphique")
+                        if chart_path:
+                            st.image(chart_path, use_column_width=True)
+                    
+                    # Download
+                    with open(zip_path, 'rb') as f:
+                        st.download_button(
+                            "📦 Télécharger Package Complet",
+                            f.read(),
+                            f"ai_content_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                            "application/zip",
+                            use_container_width=True
+                        )
+            else:
+                st.error("Décrivez votre sujet")
+    
+    with col2:
+        st.header("💡 Guide")
+        st.info("""
+        **Comment utiliser :**
+        1. Décrivez votre sujet
+        2. Choisissez le style
+        3. Cliquez "Générer"
+        4. Téléchargez le package
+        
+        **Package inclut :**
+        - Script optimisé
+        - Miniature HD
+        - Graphique pro
+        - Audio MP3
+        """)
+        
+        st.header("📊 Stats")
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            st.metric("Générées", "847", "+12")
+        with col_s2:
+            st.metric("Succès", "98.3%", "+0.2%")
+
+if __name__ == "__main__":
+    main()
