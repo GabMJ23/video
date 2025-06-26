@@ -1,0 +1,47 @@
+# Core Streamlit
+streamlit>=1.28.0
+streamlit-option-menu>=0.3.6
+
+# Video Processing
+moviepy>=1.0.3
+imageio>=2.31.1
+imageio-ffmpeg>=0.4.8
+
+# Audio Processing  
+gtts>=2.4.0
+pydub>=0.25.1
+
+# Image Processing
+Pillow>=10.0.0
+opencv-python-headless>=4.8.0
+
+# Data Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.15.0
+
+# AI/ML Libraries
+openai>=1.3.0
+anthropic>=0.8.0
+
+# HTTP Requests
+requests>=2.31.0
+httpx>=0.25.0
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Utilities
+python-dotenv>=1.0.0
+tempfile-manager>=1.0.0
+
+# Optional: Advanced TTS (commenté pour déploiement rapide)
+# torch>=2.0.0
+# torchaudio>=2.0.0
+# bark>=0.1.0
+
+# Optional: Image Generation (commenté pour version MVP)
+# diffusers>=0.21.0
+# transformers>=4.33.0
+# accelerate>=0.21.0
